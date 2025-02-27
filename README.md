@@ -3,6 +3,9 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.1.0-green.svg)
 ![Java](https://img.shields.io/badge/Java-17-orange.svg)
+![Build Status](https://img.shields.io/github/workflow/status/kenzycodex/distributed-storage/Java%20CI%20with%20Maven/main)
+![Issues](https://img.shields.io/github/issues/kenzycodex/distributed-storage)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 A robust and scalable Java distributed storage system with an intelligent load balancer for managing file storage across multiple nodes.
 
@@ -12,23 +15,25 @@ DistributedStorage is a high-performance distributed file storage system designe
 
 ### Key Features
 
-- **Dynamic Load Balancing**: Multiple algorithms including round-robin, least-connection, and weighted strategies to optimize resource utilization
-- **Automatic Node Health Monitoring**: Continuous health checks with automatic failover for fault tolerance
-- **Real-time Metrics**: Comprehensive performance tracking for the entire system and individual nodes
+- **Dynamic Load Balancing**: Multiple algorithms including round-robin, least-connection, and weighted strategies
+- **Automatic Health Monitoring**: Continuous health checks with automatic failover
+- **Real-time Metrics**: Comprehensive performance tracking for system and nodes
 - **Horizontal Scalability**: Seamlessly add or remove storage nodes without downtime
 - **File Redundancy**: Optional file replication for enhanced data durability
 - **RESTful API**: Simple yet powerful API for file operations
-- **Containerization Support**: Designed to work efficiently in Docker/Kubernetes environments
+- **Containerization Support**: Designed for Docker/Kubernetes environments
 
 ## Architecture
 
 DistributedStorage consists of three main components:
 
-1. **Load Balancer**: Receives client requests and intelligently routes them to the appropriate storage nodes
+1. **Load Balancer**: Receives client requests and intelligently routes them to appropriate storage nodes
 2. **Storage Nodes**: Independent servers that store and manage files
 3. **Metadata Service**: Tracks file locations and system configuration
 
-![Architecture Diagram](docs/images/architecture.png)
+<div align="center">
+  <img src="docs/images/architecture-diagram.png" alt="Architecture Diagram" width="700"/>
+</div>
 
 ## Getting Started
 
@@ -107,41 +112,25 @@ curl -X GET -H "X-User-ID: 1" http://localhost:8080/api/v1/files/123 --output fi
 curl -X DELETE -H "X-User-ID: 1" http://localhost:8080/api/v1/files/123
 ```
 
+## Documentation
+
 ### Configuration
 
-All configuration options are available in `application.yml`. Key configuration sections include:
+All configuration options are available in `application.yml`. For detailed information on configuration properties, see our [Configuration Guide](docs/configuration.md).
 
-- **Load Balancing Strategies**: Configure which algorithms are available and set the default
-- **Health Check Parameters**: Adjust frequency and thresholds for node health monitoring
-- **Metrics Collection**: Configure retention policies and collection intervals
+### API Reference
 
-See [Configuration Guide](docs/configuration.md) for detailed information.
+For comprehensive API documentation including endpoints, request/response formats, and examples, see our [API Guide](docs/api.md).
 
-## API Documentation
+### Load Balancing Strategies
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/files/upload` | POST | Upload a file |
-| `/api/v1/files/{fileId}` | GET | Download a file |
-| `/api/v1/files/{fileId}` | DELETE | Delete a file |
-| `/api/v1/nodes/register` | POST | Register a new storage node |
-| `/api/v1/nodes/heartbeat` | POST | Node heartbeat update |
-| `/api/v1/health/status` | GET | Get health status of all nodes |
-| `/api/v1/metrics/stats` | GET | Get system metrics |
+DistributedStorage supports multiple load balancing algorithms to optimize different workloads. Learn more in the [Load Balancing Strategies](docs/load-balancing-strategies.md) documentation.
 
-For detailed API documentation, see [API Guide](docs/api.md).
+### Roadmap
 
-## Load Balancing Strategies
+For information about planned features and enhancements, see our [Project Roadmap](ROADMAP.md).
 
-DistributedStorage supports multiple load balancing strategies:
-
-- **Round Robin**: Distributes requests evenly across all available nodes
-- **Least Connection**: Routes requests to the node with the fewest active connections
-- **Shortest Job Next**: Prioritizes nodes for smaller file operations
-- **Weighted Round Robin**: Distributes load based on node capacity
-- **First Come First Serve**: Simple queue-based allocation
-
-## Performance Metrics
+## Monitoring & Metrics
 
 The system collects comprehensive metrics including:
 
@@ -151,7 +140,7 @@ The system collects comprehensive metrics including:
 - Connection counts per node
 - Storage utilization
 
-Metrics are accessible via REST endpoints and can be integrated with monitoring systems like Prometheus and Grafana.
+Metrics are accessible via REST endpoints and can be integrated with Prometheus and Grafana using the provided configurations.
 
 ## Development
 
@@ -170,11 +159,11 @@ distributed-storage/
 │   │   │   ├── service/          # Business logic
 │   │   │   ├── strategy/         # Load balancing algorithms
 │   │   │   └── LoadBalancerApplication.java
-│   │   └── resources/
-│   │       ├── application.yml   # Common configuration
-│   │       ├── application-dev.yml
-│   │       └── application-prod.yml
+│   │   └── resources/            # Configuration files
 │   └── test/                     # Test classes
+├── .github/                      # GitHub integration
+│   ├── ISSUE_TEMPLATE/           # Issue templates
+│   └── workflows/                # CI/CD workflows
 ├── docker/                       # Docker configurations
 ├── docs/                         # Documentation
 └── scripts/                      # Utility scripts
@@ -194,9 +183,33 @@ mvn clean package
 mvn test
 ```
 
-### Contributing
+## Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions from the community! Please check our [Contributing Guidelines](CONTRIBUTING.md) before submitting issues or pull requests.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to your branch
+5. Create a pull request
+
+For more details, please read our [Contributing Guidelines](CONTRIBUTING.md).
+
+### Code of Conduct
+
+Please note that this project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+
+### Reporting Security Issues
+
+For security-related issues, please refer to our [Security Policy](SECURITY.md) instead of filing a public issue.
+
+## Versioning & Changelog
+
+This project follows [Semantic Versioning](https://semver.org/).
+
+See our [Changelog](CHANGELOG.md) for a detailed history of changes.
 
 ## License
 
@@ -204,9 +217,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Spring Boot team for the excellent framework
-- The open source community for inspiration and support
+We're grateful to all [contributors](ACKNOWLEDGEMENTS.md) who have helped shape this project.
 
-## Contact
+## Contact & Support
 
-For questions or support, please open an issue on the GitHub repository.
+- **Issues**: For bugs and feature requests, please [create an issue](https://github.com/kenzycodex/distributed-storage/issues/new/choose)
+- **Discussions**: For questions and general discussion, use [GitHub Discussions](https://github.com/kenzycodex/distributed-storage/discussions)
+
+For other inquiries, please open an issue on the GitHub repository.

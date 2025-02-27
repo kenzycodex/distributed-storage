@@ -1,0 +1,70 @@
+graph TD
+    subgraph "Client Applications"
+        A[Web Client]
+        B[Mobile Client]
+        C[API Client]
+    end
+
+    subgraph "Load Balancer"
+        D[API Gateway]
+        E[Load Balancing Strategies]
+        F[Health Check Service]
+        G[Metrics Service]
+        H[File Distribution Service]
+    end
+
+    subgraph "Metadata Services"
+        I[File Metadata DB]
+        J[Node Registry]
+        K[Metrics Repository]
+    end
+
+    subgraph "Storage Nodes"
+        L[Storage Node 1]
+        M[Storage Node 2]
+        N[Storage Node 3]
+        O[Storage Node n...]
+    end
+
+    subgraph "Monitoring"
+        P[Prometheus]
+        Q[Grafana Dashboards]
+    end
+
+    A --> D
+    B --> D
+    C --> D
+
+    D --> E
+    D --> H
+    E --> H
+    F --> |Health Data| G
+    G --> K
+
+    H --> L
+    H --> M
+    H --> N
+    H --> O
+
+    H --> I
+    F --> J
+
+    L --> |Heartbeat| F
+    M --> |Heartbeat| F
+    N --> |Heartbeat| F
+    O --> |Heartbeat| F
+
+    G --> P
+    P --> Q
+
+    classDef client fill:#4CAF50,stroke:#2E7D32,color:#FFFFFF;
+    classDef loadbalancer fill:#1E88E5,stroke:#1565C0,color:#FFFFFF;
+    classDef metadata fill:#FF9800,stroke:#E65100,color:#FFFFFF;
+    classDef storage fill:#E53935,stroke:#B71C1C,color:#FFFFFF;
+    classDef monitoring fill:#8E24AA,stroke:#6A1B9A,color:#FFFFFF;
+
+    class A,B,C client;
+    class D,E,F,G,H loadbalancer;
+    class I,J,K metadata;
+    class L,M,N,O storage;
+    class P,Q monitoring;
