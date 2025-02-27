@@ -201,6 +201,10 @@ For more details, please read our [Contributing Guidelines](CONTRIBUTING.md).
 
 Please note that this project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
+## Community
+
+We use GitHub Discussions to connect with our users and contributors. Check out our [Discussions page](link-to-discussions-page) to ask questions, share ideas, or get help. See our [discussion guidelines](DISCUSSIONS.md) for more information.
+
 ### Reporting Security Issues
 
 For security-related issues, please refer to our [Security Policy](SECURITY.md) instead of filing a public issue.
