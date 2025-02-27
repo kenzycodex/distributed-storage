@@ -1,4 +1,3 @@
-// util/RequestProcessor.java
 package com.loadbalancer.util;
 
 import com.loadbalancer.model.entity.StorageNode;
@@ -10,40 +9,65 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+/**
+ * Utility for processing storage node requests asynchronously.
+ */
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class RequestProcessor {
-  private final LoadBalancerService loadBalancerService;
-  private final MetricsService metricsService;
+    private final LoadBalancerService loadBalancerService;
+    private final MetricsService metricsService;
 
-  public CompletableFuture<Void> processRequest(StorageNode node, String requestId, long fileSize) {
-    return CompletableFuture.runAsync(
-        () -> {
-          String nodeId = node.getContainerId().toString();
-          Instant start = Instant.now();
-          boolean success = false;
+    // Constants
+    private static final String ERROR_PROCESSING_REQUEST = "Error processing request {} on node {}: {}";
+    private static final double MILLISECONDS_TO_SECONDS = 1000.0;
+    private static final boolean DEFAULT_REQUEST_SUCCESS = true;
 
-          try {
-            // Simulate request processing
-            success = executeRequest(node, requestId, fileSize);
-          } catch (Exception e) {
-            log.error(
-                "Error processing request {} on node {}: {}", requestId, nodeId, e.getMessage(), e);
-          } finally {
-            double duration = calculateDuration(start);
-            metricsService.recordRequest(nodeId, success, duration);
-            loadBalancerService.decrementNodeConnections(nodeId);
-          }
-        });
-  }
+    /**
+     * Processes a request asynchronously.
+     *
+     * @param node The storage node to process the request
+     * @param requestId The ID of the request
+     * @return A CompletableFuture that completes when the request is processed
+     */
+    public CompletableFuture<Void> processRequest(StorageNode node, String requestId) {
+        return CompletableFuture.runAsync(
+                () -> {
+                    String nodeId = node.getContainerId().toString();
+                    Instant start = Instant.now();
+                    boolean success = false;
 
-  private boolean executeRequest(StorageNode node, String requestId, long fileSize) {
-    // Implement actual request execution logic here
-    return true;
-  }
+                    try {
+                        // Simulate request processing
+                        success = executeRequest();
+                    } catch (Exception e) {
+                        log.error(ERROR_PROCESSING_REQUEST, requestId, nodeId, e.getMessage(), e);
+                    } finally {
+                        double duration = calculateDuration(start);
+                        metricsService.recordRequest(nodeId, success, duration);
+                        loadBalancerService.decrementNodeConnections(nodeId);
+                    }
+                });
+    }
 
-  private double calculateDuration(Instant start) {
-    return (Instant.now().toEpochMilli() - start.toEpochMilli()) / 1000.0;
-  }
+    /**
+     * Executes the actual request.
+     *
+     * @return Whether the request was successful
+     */
+    private boolean executeRequest() {
+        // Implement actual request execution logic here
+        return DEFAULT_REQUEST_SUCCESS;
+    }
+
+    /**
+     * Calculates the duration of a request in seconds.
+     *
+     * @param start The start time of the request
+     * @return The duration in seconds
+     */
+    private double calculateDuration(Instant start) {
+        return (Instant.now().toEpochMilli() - start.toEpochMilli()) / MILLISECONDS_TO_SECONDS;
+    }
 }

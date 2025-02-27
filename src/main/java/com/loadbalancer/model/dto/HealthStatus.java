@@ -15,5 +15,5 @@ public class HealthStatus {
   private int activeConnections;
   private LocalDateTime lastChecked;
   private String statusMessage;
-  private long responseTime;
+  private double responseTime;
 }

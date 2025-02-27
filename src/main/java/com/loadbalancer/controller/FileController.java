@@ -5,6 +5,8 @@ import com.loadbalancer.service.LoadBalancerService;
 import com.loadbalancer.service.StorageNodeService;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Collections;
+import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -15,6 +17,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Controller handling file operations through a load balancer architecture.
+ * Forwards requests to appropriate storage nodes.
+ */
 @RestController
 @RequestMapping("/api/v1/files")
 @RequiredArgsConstructor
@@ -24,112 +30,160 @@ public class FileController {
   private final StorageNodeService storageNodeService;
   private final RestTemplate restTemplate;
 
+  // Constants for duplicated literals
+  private static final String HEADER_USER_ID = "X-User-ID";
+  private static final String KEY_ERROR = "error";
+  private static final String KEY_MESSAGE = "message";
+  private static final String KEY_TIMESTAMP = "timestamp";
+  private static final String FILE_PARAM = "file";
+  private static final String API_PATH_FORMAT = "http://%s:%d/api/v1/files/%s";
+  private static final String UPLOAD_PATH = "upload";
+  private static final String UPLOAD_FAILED = "Upload failed";
+  private static final String DOWNLOAD_FAILED = "Download failed: ";
+  private static final String DELETION_FAILED = "Deletion failed";
+  private static final String FILE_UPLOAD_FAILED_LOG = "File upload failed";
+  private static final String FILE_DOWNLOAD_FAILED_LOG = "File download failed";
+  private static final String FILE_DELETION_FAILED_LOG = "File deletion failed";
+
+  /**
+   * Uploads a file to the selected storage node.
+   *
+   * @param file The file to upload
+   * @param userId The ID of the user uploading the file
+   * @return Response from the storage node
+   */
   @PostMapping("/upload")
-  public ResponseEntity<?> uploadFile(
-      @RequestParam("file") MultipartFile file, @RequestHeader("X-User-ID") Long userId) {
+  public ResponseEntity<Map<String, Object>> uploadFile(
+          @RequestParam(FILE_PARAM) MultipartFile file, @RequestHeader(HEADER_USER_ID) Long userId) {
     long startTime = System.currentTimeMillis();
     StorageNode selectedNode = null;
     try {
       selectedNode = loadBalancerService.selectNode(null, file.getSize());
       log.info(
-          "Selected node {} for file upload, size: {}",
-          selectedNode.getContainerId(),
-          file.getSize());
+              "Selected node {} for file upload, size: {}",
+              selectedNode.getContainerId(),
+              file.getSize());
 
-      String uploadUrl =
-          String.format(
-              "http://%s:%d/api/v1/files/upload",
-              selectedNode.getHostAddress(), selectedNode.getPort());
+      String uploadUrl = String.format(
+              API_PATH_FORMAT,
+              selectedNode.getHostAddress(),
+              selectedNode.getPort(),
+              UPLOAD_PATH);
 
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-      headers.set("X-User-ID", userId.toString());
+      headers.set(HEADER_USER_ID, userId.toString());
 
       MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
       body.add(
-          "file",
-          new ByteArrayResource(file.getBytes()) {
-            @Override
-            public String getFilename() {
-              return file.getOriginalFilename();
-            }
-          });
+              FILE_PARAM,
+              createByteResource(file));
 
-      ResponseEntity<?> response =
-          restTemplate.postForEntity(uploadUrl, new HttpEntity<>(body, headers), Map.class);
+      ResponseEntity<Map> response =
+              restTemplate.postForEntity(uploadUrl, new HttpEntity<>(body, headers), Map.class);
 
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(selectedNode.getContainerId().toString(), true, duration);
 
-      return response;
-
+      @SuppressWarnings("unchecked")
+      Map<String, Object> responseBody = response.getBody();
+      return ResponseEntity.status(response.getStatusCode()).body(responseBody);
     } catch (Exception e) {
-      log.error("File upload failed", e);
+      log.error(FILE_UPLOAD_FAILED_LOG, e);
       if (selectedNode != null) {
         long duration = System.currentTimeMillis() - startTime;
         loadBalancerService.recordRequest(
-            selectedNode.getContainerId().toString(), false, duration);
+                selectedNode.getContainerId().toString(), false, duration);
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(
-              Map.of(
-                  "error", "Upload failed",
-                  "message", e.getMessage(),
-                  "timestamp", Instant.now()));
+
+      Map<String, Object> errorResponse = new HashMap<>();
+      errorResponse.put(KEY_ERROR, UPLOAD_FAILED);
+      errorResponse.put(KEY_MESSAGE, e.getMessage());
+      errorResponse.put(KEY_TIMESTAMP, Instant.now());
+
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
   }
 
+  /**
+   * Creates a ByteArrayResource for file transfer.
+   *
+   * @param file The MultipartFile to convert
+   * @return ByteArrayResource with the file's content
+   * @throws Exception If reading the file fails
+   */
+  private ByteArrayResource createByteResource(final MultipartFile file) throws Exception {
+    return new ByteArrayResource(file.getBytes()) {
+      @Override
+      public String getFilename() {
+        return file.getOriginalFilename();
+      }
+    };
+  }
+
+  /**
+   * Downloads a file from the storage node containing it.
+   *
+   * @param fileId The ID of the file to download
+   * @param userId The ID of the user downloading the file
+   * @return The file content
+   */
   @GetMapping("/{fileId}")
-  public ResponseEntity<?> downloadFile(
-      @PathVariable Long fileId, @RequestHeader("X-User-ID") Long userId) {
+  public ResponseEntity<byte[]> downloadFile(
+          @PathVariable Long fileId, @RequestHeader(HEADER_USER_ID) Long userId) {
     long startTime = System.currentTimeMillis();
     StorageNode node = null;
     try {
       node = loadBalancerService.getNodeForFile(fileId);
-      String downloadUrl =
-          String.format(
-              "http://%s:%d/api/v1/files/%d", node.getHostAddress(), node.getPort(), fileId);
+      String downloadUrl = String.format(
+              API_PATH_FORMAT,
+              node.getHostAddress(),
+              node.getPort(),
+              fileId.toString());
 
       HttpHeaders headers = new HttpHeaders();
-      headers.set("X-User-ID", userId.toString());
+      headers.set(HEADER_USER_ID, userId.toString());
 
       ResponseEntity<byte[]> response =
-          restTemplate.exchange(
-              downloadUrl, HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
+              restTemplate.exchange(
+                      downloadUrl, HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
 
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(node.getContainerId().toString(), true, duration);
 
       return ResponseEntity.ok().headers(response.getHeaders()).body(response.getBody());
-
     } catch (Exception e) {
-      log.error("File download failed", e);
+      log.error(FILE_DOWNLOAD_FAILED_LOG, e);
       if (node != null) {
         long duration = System.currentTimeMillis() - startTime;
         loadBalancerService.recordRequest(node.getContainerId().toString(), false, duration);
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(
-              Map.of(
-                  "error", "Download failed",
-                  "message", e.getMessage(),
-                  "timestamp", Instant.now()));
+      throw new RuntimeException(DOWNLOAD_FAILED + e.getMessage(), e);
     }
   }
 
+  /**
+   * Deletes a file from the storage node containing it.
+   *
+   * @param fileId The ID of the file to delete
+   * @param userId The ID of the user deleting the file
+   * @return Success or error response
+   */
   @DeleteMapping("/{fileId}")
-  public ResponseEntity<?> deleteFile(
-      @PathVariable Long fileId, @RequestHeader("X-User-ID") Long userId) {
+  public ResponseEntity<Map<String, Object>> deleteFile(
+          @PathVariable Long fileId, @RequestHeader(HEADER_USER_ID) Long userId) {
     long startTime = System.currentTimeMillis();
     StorageNode node = null;
     try {
       node = loadBalancerService.getNodeForFile(fileId);
-      String deleteUrl =
-          String.format(
-              "http://%s:%d/api/v1/files/%d", node.getHostAddress(), node.getPort(), fileId);
+      String deleteUrl = String.format(
+              API_PATH_FORMAT,
+              node.getHostAddress(),
+              node.getPort(),
+              fileId.toString());
 
       HttpHeaders headers = new HttpHeaders();
-      headers.set("X-User-ID", userId.toString());
+      headers.set(HEADER_USER_ID, userId.toString());
 
       restTemplate.exchange(deleteUrl, HttpMethod.DELETE, new HttpEntity<>(headers), Void.class);
 
@@ -137,19 +191,19 @@ public class FileController {
       loadBalancerService.recordRequest(node.getContainerId().toString(), true, duration);
 
       return ResponseEntity.noContent().build();
-
     } catch (Exception e) {
-      log.error("File deletion failed", e);
+      log.error(FILE_DELETION_FAILED_LOG, e);
       if (node != null) {
         long duration = System.currentTimeMillis() - startTime;
         loadBalancerService.recordRequest(node.getContainerId().toString(), false, duration);
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(
-              Map.of(
-                  "error", "Deletion failed",
-                  "message", e.getMessage(),
-                  "timestamp", Instant.now()));
+
+      Map<String, Object> errorResponse = new HashMap<>();
+      errorResponse.put(KEY_ERROR, DELETION_FAILED);
+      errorResponse.put(KEY_MESSAGE, e.getMessage());
+      errorResponse.put(KEY_TIMESTAMP, Instant.now());
+
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
   }
 }
