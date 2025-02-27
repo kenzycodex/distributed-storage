@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4  # Updated to latest version
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4  # Updated to v4
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -34,6 +34,13 @@ jobs:
         with:
           name: test-coverage-report
           path: target/site/jacoco/
+          
+      # Add this step to make the JAR available for the Docker job
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/*.jar
 
   sonarcloud:
     name: SonarCloud Analysis
@@ -62,8 +69,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        # Added sonar.qualitygate.wait=true to fail the build if quality gate fails
-        # Added sonar.scanner.force-ci-analysis=true to override automatic analysis
         run: >
           mvn -B verify sonar:sonar
           -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
@@ -80,6 +85,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      
+      # Download the JAR file that was built in the build job
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: app
+      
+      # List the contents to confirm the JAR exists
+      - name: List downloaded files
+        run: ls -la app/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -96,3 +112,6 @@ jobs:
           context: .
           push: true
           tags: kenzycodex/distributed-storage:latest,kenzycodex/distributed-storage:${{ github.sha }}
+          # Add build args to specify the JAR location
+          build-args: |
+            JAR_FILE=app/*.jar
