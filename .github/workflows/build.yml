@@ -27,7 +27,7 @@ jobs:
         run: mvn -B test
 
       - name: Generate test coverage report
-        run: mvn -B jacoco:report
+        run: mvn verify
 
       - name: Upload test coverage
         uses: actions/upload-artifact@v4  # ✅ Updated from v3 to v4
