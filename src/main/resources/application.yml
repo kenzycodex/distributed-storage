@@ -1,0 +1,81 @@
+# application.yml (Common settings for all environments)
+spring:
+  application:
+    name: load-balancer
+  jpa:
+    hibernate:
+      ddl-auto: update
+      naming:
+        # Explicit naming strategy
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    show-sql: false
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 20
+    max-connections: 10000
+    accept-count: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+loadbalancer:
+  strategies:
+    default: round-robin
+    available:
+      - round-robin
+      - least-connection
+      - shortest-job-next
+      - first-come-first-serve
+      - weighted-round-robin
+  health-check:
+    interval: 30000
+    failure-threshold: 4
+    success-threshold: 1
+  heartbeat:
+    interval: 30000
+  metrics:
+    enabled: true
+    collection-interval: 15000
+    retention-days: 30
+  queue:
+    max-size: 10000
+    worker-threads: 5
+    batch-size: 100
+    retry:
+      max-attempts: 3
+      initial-interval: 1000
+      multiplier: 2
+      max-interval: 10000
+
+logging:
+  level:
+    root: INFO
+    com.loadbalancer: DEBUG
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/load-balancer.log
+    max-size: 10MB
+    max-history: 7

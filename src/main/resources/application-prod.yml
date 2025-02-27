@@ -1,0 +1,16 @@
+# application-prod.yml (Production environment settings)
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:mysql://mysql-db:3306/loadbalancer
+    username: loadbalancer
+    password: loadbalancer
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000

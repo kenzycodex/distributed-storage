@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'loadbalancer'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['loadbalancer:8080']
+        labels:
+          service: 'loadbalancer'
+
+  - job_name: 'storage-nodes'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['storage-node-1:8081', 'storage-node-2:8082', 'storage-node-3:8083']
+        labels:
+          service: 'storage'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'monitoring'

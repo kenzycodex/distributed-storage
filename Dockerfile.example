@@ -1,0 +1,46 @@
+FROM eclipse-temurin:17-jdk-alpine as build
+WORKDIR /workspace/app
+
+# Copy maven executable to the image
+COPY mvnw .
+COPY .mvn .mvn
+
+# Copy the pom.xml file
+COPY pom.xml .
+
+# Build all the dependencies in preparation to go offline
+RUN ./mvnw dependency:go-offline -B
+
+# Copy source code
+COPY src src
+
+# Package the application
+RUN ./mvnw package -DskipTests
+RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
+
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
+VOLUME /tmp
+VOLUME /logs
+
+ARG DEPENDENCY=/workspace/app/target/dependency
+
+# Copy project dependencies
+COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
+COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
+COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
+
+# Create a non-root user and group
+RUN addgroup -S loadbalancer && adduser -S loadbalancer -G loadbalancer
+
+# Set proper permissions
+RUN chown -R loadbalancer:loadbalancer /app /tmp /logs
+
+# Switch to non-root user
+USER loadbalancer
+
+# Set environment variables
+ENV JAVA_OPTS="-Xmx512m -Xms256m"
+
+# Run the application
+ENTRYPOINT ["java", "-cp", "app:app/lib/*", "com.loadbalancer.LoadBalancerApplication"]

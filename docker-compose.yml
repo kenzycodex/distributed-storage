@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: distributed-storage-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: loadbalancer
+      MYSQL_USER: loadbalancer
+      MYSQL_PASSWORD: loadbalancer
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - storage-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "loadbalancer", "-ploadbalancer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Load Balancer Service
+  loadbalancer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: distributed-storage-loadbalancer
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/loadbalancer
+      SPRING_DATASOURCE_USERNAME: loadbalancer
+      SPRING_DATASOURCE_PASSWORD: loadbalancer
+    networks:
+      - storage-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Storage Node 1
+  storage-node-1:
+    build:
+      context: ./storage-node
+      dockerfile: Dockerfile
+    container_name: storage-node-1
+    restart: always
+    depends_on:
+      loadbalancer:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8081
+      NODE_NAME: storage-node-1
+      NODE_CAPACITY: 10737418240 # 10GB
+      LOADBALANCER_HOST: loadbalancer
+      LOADBALANCER_PORT: 8080
+    volumes:
+      - storage-node-1-data:/app/storage
+    networks:
+      - storage-network
+    ports:
+      - "8081:8081"
+
+  # Storage Node 2
+  storage-node-2:
+    build:
+      context: ./storage-node
+      dockerfile: Dockerfile
+    container_name: storage-node-2
+    restart: always
+    depends_on:
+      loadbalancer:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8082
+      NODE_NAME: storage-node-2
+      NODE_CAPACITY: 10737418240 # 10GB
+      LOADBALANCER_HOST: loadbalancer
+      LOADBALANCER_PORT: 8080
+    volumes:
+      - storage-node-2-data:/app/storage
+    networks:
+      - storage-network
+    ports:
+      - "8082:8082"
+
+  # Storage Node 3
+  storage-node-3:
+    build:
+      context: ./storage-node
+      dockerfile: Dockerfile
+    container_name: storage-node-3
+    restart: always
+    depends_on:
+      loadbalancer:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8083
+      NODE_NAME: storage-node-3
+      NODE_CAPACITY: 10737418240 # 10GB
+      LOADBALANCER_HOST: loadbalancer
+      LOADBALANCER_PORT: 8080
+    volumes:
+      - storage-node-3-data:/app/storage
+    networks:
+      - storage-network
+    ports:
+      - "8083:8083"
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: always
+    depends_on:
+      - loadbalancer
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - storage-network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: always
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - storage-network
+
+networks:
+  storage-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  storage-node-1-data:
+  storage-node-2-data:
+  storage-node-3-data:
+  prometheus-data:
+  grafana-data:
