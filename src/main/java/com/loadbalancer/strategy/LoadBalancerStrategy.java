@@ -5,5 +5,5 @@ import com.loadbalancer.model.entity.StorageNode;
 import java.util.List;
 
 public interface LoadBalancerStrategy {
-    StorageNode selectNode(List<StorageNode> nodes, long fileSize);
+  StorageNode selectNode(List<StorageNode> nodes, long fileSize);
 }

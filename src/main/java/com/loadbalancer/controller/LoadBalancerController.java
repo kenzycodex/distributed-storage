@@ -13,26 +13,23 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 public class LoadBalancerController {
-    private final LoadBalancerService loadBalancerService;
+  private final LoadBalancerService loadBalancerService;
 
-    @GetMapping("/node")
-    public
-    ResponseEntity<StorageNode> getNode(
-            @RequestParam(required = false) String strategy,
-            @RequestParam long fileSize) {
-        try {
-            StorageNode node = loadBalancerService.selectNode(strategy, fileSize);
-            loadBalancerService.incrementNodeConnections(node.getContainerId().toString());
-            return ResponseEntity.ok(node);
-        } catch (IllegalStateException e) {
-            return ResponseEntity.notFound().build();
-        }
+  @GetMapping("/node")
+  public ResponseEntity<StorageNode> getNode(
+      @RequestParam(required = false) String strategy, @RequestParam long fileSize) {
+    try {
+      StorageNode node = loadBalancerService.selectNode(strategy, fileSize);
+      loadBalancerService.incrementNodeConnections(node.getContainerId().toString());
+      return ResponseEntity.ok(node);
+    } catch (IllegalStateException e) {
+      return ResponseEntity.notFound().build();
     }
+  }
 
-    @PostMapping("/node/{nodeId}/complete")
-    public
-    ResponseEntity<Void> completeRequest(@PathVariable String nodeId) {
-        loadBalancerService.decrementNodeConnections(nodeId);
-        return ResponseEntity.ok().build();
-    }
+  @PostMapping("/node/{nodeId}/complete")
+  public ResponseEntity<Void> completeRequest(@PathVariable String nodeId) {
+    loadBalancerService.decrementNodeConnections(nodeId);
+    return ResponseEntity.ok().build();
+  }
 }

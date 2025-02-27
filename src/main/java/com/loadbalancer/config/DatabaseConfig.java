@@ -9,5 +9,5 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 @EnableJpaAuditing
 public class DatabaseConfig {
-    // Database configuration if needed
+  // Database configuration if needed
 }

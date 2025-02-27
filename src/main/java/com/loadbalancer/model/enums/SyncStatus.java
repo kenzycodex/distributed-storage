@@ -2,11 +2,11 @@
 package com.loadbalancer.model.enums;
 
 public enum SyncStatus {
-    PENDING,
-    PROCESSING,
-    IN_PROGRESS,
-    COMPLETED,
-    FAILED,
-    RETRY,
-    CANCELLED
+  PENDING,
+  PROCESSING,
+  IN_PROGRESS,
+  COMPLETED,
+  FAILED,
+  RETRY,
+  CANCELLED
 }
