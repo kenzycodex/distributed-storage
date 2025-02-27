@@ -89,20 +89,15 @@ public class HealthCheckService {
 
     try {
       restTemplate.getForEntity(url, String.class);
-      // No cast needed as System.currentTimeMillis() returns a long, and subtraction of longs is a long
-      // which can be implicitly converted to double for the recordRequest method
       double duration = System.currentTimeMillis() - startTime;
       metricsService.recordRequest(node.getContainerId().toString(), true, duration);
     } catch (Exception e) {
       isHealthy = false;
       statusMessage = e.getMessage();
-      // No cast needed here either
       double duration = System.currentTimeMillis() - startTime;
       metricsService.recordRequest(node.getContainerId().toString(), false, duration);
     }
 
-    // No cast needed here either - the subtraction of two longs results in a long
-    // which can be implicitly converted to double
     double responseTime = System.currentTimeMillis() - startTime;
 
     return HealthStatus.builder()

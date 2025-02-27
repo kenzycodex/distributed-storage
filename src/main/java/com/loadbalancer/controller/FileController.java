@@ -84,13 +84,18 @@ public class FileController {
               FILE_PARAM,
               createByteResource(file));
 
-      ResponseEntity<Map> response =
-              restTemplate.postForEntity(uploadUrl, new HttpEntity<>(body, headers), Map.class);
+      // Use explicit HashMap type to match the return type
+      @SuppressWarnings("unchecked")
+      HashMap<String, Object> responseMap = restTemplate.postForObject(
+              uploadUrl,
+              new HttpEntity<>(body, headers),
+              HashMap.class
+      );
 
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(selectedNode.getContainerId().toString(), true, duration);
 
-      return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+      return ResponseEntity.ok(responseMap);
     } catch (Exception e) {
       log.error(FILE_UPLOAD_FAILED_LOG, e);
       if (selectedNode != null) {

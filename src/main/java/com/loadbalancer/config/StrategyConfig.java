@@ -1,11 +1,11 @@
 package com.loadbalancer.config;
 
-import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
 
-import jakarta.annotation.PostConstruct;
+import javax.annotation.PostConstruct;
 
 /**
  * Configuration class to register bean aliases for strategy components.
@@ -14,8 +14,17 @@ import jakarta.annotation.PostConstruct;
 @Configuration
 public class StrategyConfig {
 
+    private final ApplicationContext applicationContext;
+
+    /**
+     * Constructor for dependency injection.
+     *
+     * @param applicationContext The Spring application context
+     */
     @Autowired
-    private BeanFactory beanFactory;
+    public StrategyConfig(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
 
     /**
      * Register aliases for all strategy beans to maintain backward compatibility
@@ -23,7 +32,7 @@ public class StrategyConfig {
      */
     @PostConstruct
     public void registerAliases() {
-        DefaultListableBeanFactory factory = (DefaultListableBeanFactory) beanFactory;
+        DefaultListableBeanFactory factory = (DefaultListableBeanFactory) applicationContext.getAutowireCapableBeanFactory();
 
         // Register aliases for all strategy beans
         factory.registerAlias("roundRobin", "round-robin");
