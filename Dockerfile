@@ -1,5 +1,5 @@
 # Use OpenJDK 17 as the base image
-FROM openjdk:17-slim
+FROM openjdk:18-slim
 
 # Install curl for healthcheck
 RUN apt-get update && \
