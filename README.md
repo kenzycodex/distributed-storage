@@ -203,7 +203,7 @@ Please note that this project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Community
 
-We use GitHub Discussions to connect with our users and contributors. Check out our [Discussions page](link-to-discussions-page) to ask questions, share ideas, or get help. See our [discussion guidelines](DISCUSSIONS.md) for more information.
+We use GitHub Discussions to connect with our users and contributors. Check out our [Discussions page](https://github.com/kenzycodex/distributed-storage/discussions) to ask questions, share ideas, or get help. See our [discussion guidelines](DISCUSSIONS.md) for more information.
 
 ### Reporting Security Issues
 
