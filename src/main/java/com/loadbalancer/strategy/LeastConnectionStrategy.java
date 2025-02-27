@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * Load balancing strategy that selects the node with the fewest active connections.
  * This helps distribute load evenly across nodes based on their current workload.
  */
-@Component("least-connection")
+@Component(value = "leastConnection")
 public class LeastConnectionStrategy implements LoadBalancerStrategy {
   private final LoadBalancerService loadBalancerService;
 

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * Load balancing strategy that uses a weighted round-robin approach based on node capacity.
  * Nodes with more available space receive proportionally more requests.
  */
-@Component("weighted-round-robin")
+@Component(value = "weightedRoundRobin")
 public class WeightedRoundRobinStrategy implements LoadBalancerStrategy {
   private final AtomicInteger counter = new AtomicInteger(0);
 

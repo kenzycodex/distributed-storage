@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * Load balancing strategy that selects the node with the least used space.
  * This helps distribute storage more evenly across available nodes.
  */
-@Component("shortest-job-next")
+@Component(value = "shortestJobNext")
 public class ShortestJobNextStrategy implements LoadBalancerStrategy {
 
   private static final String NO_AVAILABLE_NODES = "No available nodes";

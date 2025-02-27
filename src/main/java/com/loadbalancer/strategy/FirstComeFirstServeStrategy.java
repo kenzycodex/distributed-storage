@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
  * Load balancing strategy that selects the first available node with sufficient capacity.
  * Nodes are processed in the order they appear in the list.
  */
-@Component("first-come-first-serve")
+@Component(value = "firstComeFirstServe")
 public class FirstComeFirstServeStrategy implements LoadBalancerStrategy {
 
   private static final String NO_AVAILABLE_NODES = "No available nodes";

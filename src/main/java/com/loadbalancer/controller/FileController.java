@@ -1,14 +1,16 @@
 package com.loadbalancer.controller;
 
+import com.loadbalancer.exception.FileDownloadException;
+import com.loadbalancer.exception.FileOperationException;
 import com.loadbalancer.model.entity.StorageNode;
 import com.loadbalancer.service.LoadBalancerService;
 import com.loadbalancer.service.StorageNodeService;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Collections;
 import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
@@ -36,7 +38,6 @@ public class FileController {
   private static final String KEY_MESSAGE = "message";
   private static final String KEY_TIMESTAMP = "timestamp";
   private static final String FILE_PARAM = "file";
-  private static final String API_PATH_FORMAT = "http://%s:%d/api/v1/files/%s";
   private static final String UPLOAD_PATH = "upload";
   private static final String UPLOAD_FAILED = "Upload failed";
   private static final String DOWNLOAD_FAILED = "Download failed: ";
@@ -44,6 +45,10 @@ public class FileController {
   private static final String FILE_UPLOAD_FAILED_LOG = "File upload failed";
   private static final String FILE_DOWNLOAD_FAILED_LOG = "File download failed";
   private static final String FILE_DELETION_FAILED_LOG = "File deletion failed";
+
+  // Move URI path formats to configuration
+  @Value("${api.storage.path.format:http://%s:%d/api/v1/files/%s}")
+  private String apiPathFormat;
 
   /**
    * Uploads a file to the selected storage node.
@@ -65,7 +70,7 @@ public class FileController {
               file.getSize());
 
       String uploadUrl = String.format(
-              API_PATH_FORMAT,
+              apiPathFormat,
               selectedNode.getHostAddress(),
               selectedNode.getPort(),
               UPLOAD_PATH);
@@ -85,9 +90,7 @@ public class FileController {
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(selectedNode.getContainerId().toString(), true, duration);
 
-      @SuppressWarnings("unchecked")
-      Map<String, Object> responseBody = response.getBody();
-      return ResponseEntity.status(response.getStatusCode()).body(responseBody);
+      return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
     } catch (Exception e) {
       log.error(FILE_UPLOAD_FAILED_LOG, e);
       if (selectedNode != null) {
@@ -110,15 +113,19 @@ public class FileController {
    *
    * @param file The MultipartFile to convert
    * @return ByteArrayResource with the file's content
-   * @throws Exception If reading the file fails
+   * @throws FileOperationException If reading the file fails
    */
-  private ByteArrayResource createByteResource(final MultipartFile file) throws Exception {
-    return new ByteArrayResource(file.getBytes()) {
-      @Override
-      public String getFilename() {
-        return file.getOriginalFilename();
-      }
-    };
+  private ByteArrayResource createByteResource(final MultipartFile file) throws FileOperationException {
+    try {
+      return new ByteArrayResource(file.getBytes()) {
+        @Override
+        public String getFilename() {
+          return file.getOriginalFilename();
+        }
+      };
+    } catch (Exception e) {
+      throw new FileOperationException("Failed to read file bytes", e);
+    }
   }
 
   /**
@@ -127,6 +134,7 @@ public class FileController {
    * @param fileId The ID of the file to download
    * @param userId The ID of the user downloading the file
    * @return The file content
+   * @throws FileDownloadException If the download fails
    */
   @GetMapping("/{fileId}")
   public ResponseEntity<byte[]> downloadFile(
@@ -136,7 +144,7 @@ public class FileController {
     try {
       node = loadBalancerService.getNodeForFile(fileId);
       String downloadUrl = String.format(
-              API_PATH_FORMAT,
+              apiPathFormat,
               node.getHostAddress(),
               node.getPort(),
               fileId.toString());
@@ -158,7 +166,7 @@ public class FileController {
         long duration = System.currentTimeMillis() - startTime;
         loadBalancerService.recordRequest(node.getContainerId().toString(), false, duration);
       }
-      throw new RuntimeException(DOWNLOAD_FAILED + e.getMessage(), e);
+      throw new FileDownloadException(DOWNLOAD_FAILED + e.getMessage(), e);
     }
   }
 
@@ -177,7 +185,7 @@ public class FileController {
     try {
       node = loadBalancerService.getNodeForFile(fileId);
       String deleteUrl = String.format(
-              API_PATH_FORMAT,
+              apiPathFormat,
               node.getHostAddress(),
               node.getPort(),
               fileId.toString());

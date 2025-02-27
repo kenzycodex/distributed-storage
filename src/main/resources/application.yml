@@ -25,6 +25,12 @@ server:
     max-connections: 10000
     accept-count: 100
 
+# URI configuration for file operations
+api:
+  storage:
+    path:
+      format: http://%s:%d/api/v1/files/%s
+
 management:
   endpoints:
     web:

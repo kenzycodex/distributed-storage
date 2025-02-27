@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * Load balancing strategy that cycles through available nodes in a round-robin fashion.
  * This ensures equal distribution of requests across all available nodes over time.
  */
-@Component("round-robin")
+@Component(value = "roundRobin")
 public class RoundRobinStrategy implements LoadBalancerStrategy {
   private final AtomicInteger counter = new AtomicInteger(0);
 
