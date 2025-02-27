@@ -89,25 +89,25 @@ public class HealthCheckService {
 
     try {
       restTemplate.getForEntity(url, String.class);
-      // Use explicit float promotion for long to double conversion
-      double duration = (double) (System.currentTimeMillis() - startTime);
-      metricsService.recordRequest(node.getContainerId().toString(), true, duration);
+      long endTime = System.currentTimeMillis();
+      long durationMs = endTime - startTime;
+      metricsService.recordRequest(node.getContainerId().toString(), true, durationMs);
     } catch (Exception e) {
       isHealthy = false;
       statusMessage = e.getMessage();
-      // Use explicit float promotion for long to double conversion
-      double duration = (double) (System.currentTimeMillis() - startTime);
-      metricsService.recordRequest(node.getContainerId().toString(), false, duration);
+      long endTime = System.currentTimeMillis();
+      long durationMs = endTime - startTime;
+      metricsService.recordRequest(node.getContainerId().toString(), false, durationMs);
     }
 
-    // Use explicit float promotion for long to double conversion
-    double responseTime = (double) (System.currentTimeMillis() - startTime);
+    // Calculate response time
+    long responseTimeMs = System.currentTimeMillis() - startTime;
 
     return HealthStatus.builder()
             .nodeId(node.getContainerId().toString())
             .healthy(isHealthy)
             .lastChecked(LocalDateTime.now())
-            .responseTime(responseTime)
+            .responseTime(responseTimeMs)
             .statusMessage(statusMessage)
             .build();
   }
