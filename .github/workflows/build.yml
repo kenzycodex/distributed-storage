@@ -88,7 +88,7 @@ jobs:
       
       # Download the JAR file that was built in the build job
       - name: Download JAR
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: app-jar
           path: app
