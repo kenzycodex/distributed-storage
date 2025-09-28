@@ -3,6 +3,7 @@ package com.loadbalancer.service;
 import com.loadbalancer.config.LoadBalancerConfig;
 import com.loadbalancer.exception.NoAvailableNodesException;
 import com.loadbalancer.exception.StrategyNotFoundException;
+import com.loadbalancer.model.entity.FileMetadata;
 import com.loadbalancer.model.entity.StorageNode;
 import com.loadbalancer.model.enums.NodeStatus;
 import com.loadbalancer.strategy.LoadBalancerStrategy;
@@ -21,12 +22,13 @@ import org.springframework.web.client.RestTemplate;
 public class LoadBalancerService {
   private final Map<String, LoadBalancerStrategy> strategies;
   private final StorageNodeService storageNodeService;
+  private final FileMetadataService fileMetadataService;
   private final MetricsService metricsService;
   private final LoadBalancerConfig config;
   private final RestTemplate restTemplate;
   private final Map<String, Integer> nodeConnectionCounts = new ConcurrentHashMap<>();
 
-  // Cache to store file-to-node mapping
+  // Cache to store file-to-node mapping for quick access
   private final Map<Long, Long> fileNodeCache = new ConcurrentHashMap<>();
 
   public StorageNode selectNode(String strategyName, long fileSize) {
@@ -51,7 +53,15 @@ public class LoadBalancerService {
   }
 
   public StorageNode getNodeForFile(Long fileId) {
-    // First check the cache
+    // First check the database for persistent mapping
+    Optional<StorageNode> nodeFromDb = fileMetadataService.getNodeForFile(fileId);
+    if (nodeFromDb.isPresent() && nodeFromDb.get().getStatus() == NodeStatus.ACTIVE) {
+      // Update cache and return node
+      fileNodeCache.put(fileId, nodeFromDb.get().getContainerId());
+      return nodeFromDb.get();
+    }
+
+    // If not in database, check cache as fallback
     Long nodeId = fileNodeCache.get(fileId);
     if (nodeId != null) {
       Optional<StorageNode> cachedNode = storageNodeService.getNode(nodeId);
@@ -60,7 +70,7 @@ public class LoadBalancerService {
       }
     }
 
-    // If not in cache or node not active, query each storage node
+    // Last resort: query each storage node (for legacy files not in database)
     List<StorageNode> activeNodes = storageNodeService.getAvailableNodes();
     for (StorageNode node : activeNodes) {
       try {
@@ -73,6 +83,8 @@ public class LoadBalancerService {
         if (Boolean.TRUE.equals(exists)) {
           // Update cache and return node
           fileNodeCache.put(fileId, node.getContainerId());
+          log.warn("Found file {} on node {} but not in database - consider data migration",
+                   fileId, node.getContainerId());
           return node;
         }
       } catch (Exception e) {
@@ -82,6 +94,25 @@ public class LoadBalancerService {
     }
 
     throw new NoAvailableNodesException("No node found containing file: " + fileId);
+  }
+
+  public FileMetadata storeFileMetadata(String originalFilename, String storedFilename,
+                                       Long fileSize, String contentType, Long nodeId,
+                                       Long userId, String checksum) {
+    return fileMetadataService.createFileMetadata(originalFilename, storedFilename,
+                                                  fileSize, contentType, nodeId,
+                                                  userId, checksum);
+  }
+
+  public boolean deleteFileMetadata(Long fileId) {
+    // Remove from cache
+    fileNodeCache.remove(fileId);
+    // Mark as deleted in database
+    return fileMetadataService.deleteFileMetadata(fileId);
+  }
+
+  public void updateFileAccess(Long fileId) {
+    fileMetadataService.updateLastAccessed(fileId);
   }
 
   public void recordRequest(String nodeId, boolean success, long duration) {

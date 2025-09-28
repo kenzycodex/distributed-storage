@@ -2,6 +2,7 @@ package com.loadbalancer.controller;
 
 import com.loadbalancer.exception.FileDownloadException;
 import com.loadbalancer.exception.FileOperationException;
+import com.loadbalancer.model.entity.FileMetadata;
 import com.loadbalancer.model.entity.StorageNode;
 import com.loadbalancer.service.LoadBalancerService;
 import com.loadbalancer.service.StorageNodeService;
@@ -92,6 +93,27 @@ public class FileController {
               HashMap.class
       );
 
+      if (responseMap != null && responseMap.containsKey("fileId")) {
+        // Store metadata in database
+        Long fileId = Long.valueOf(responseMap.get("fileId").toString());
+        String storedFilename = responseMap.get("fileName") != null ?
+                responseMap.get("fileName").toString() : file.getOriginalFilename();
+
+        loadBalancerService.storeFileMetadata(
+                file.getOriginalFilename(),
+                storedFilename,
+                file.getSize(),
+                file.getContentType(),
+                selectedNode.getContainerId(),
+                userId,
+                null // checksum - can be added later
+        );
+
+        // Update response with node information
+        responseMap.put("nodeId", selectedNode.getContainerId());
+        responseMap.put("nodeName", selectedNode.getContainerName());
+      }
+
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(selectedNode.getContainerId().toString(), true, duration);
 
@@ -161,6 +183,9 @@ public class FileController {
               restTemplate.exchange(
                       downloadUrl, HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
 
+      // Update file access time
+      loadBalancerService.updateFileAccess(fileId);
+
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(node.getContainerId().toString(), true, duration);
 
@@ -199,6 +224,9 @@ public class FileController {
       headers.set(HEADER_USER_ID, userId.toString());
 
       restTemplate.exchange(deleteUrl, HttpMethod.DELETE, new HttpEntity<>(headers), Void.class);
+
+      // Mark file as deleted in database
+      loadBalancerService.deleteFileMetadata(fileId);
 
       long duration = System.currentTimeMillis() - startTime;
       loadBalancerService.recordRequest(node.getContainerId().toString(), true, duration);

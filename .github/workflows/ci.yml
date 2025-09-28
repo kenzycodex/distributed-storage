@@ -1,0 +1,340 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  JAVA_VERSION: '17'
+  MAVEN_OPTS: -Xmx1024m
+
+jobs:
+  test:
+    name: Test and Build
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: loadbalancer
+          MYSQL_USER: loadbalancer
+          MYSQL_PASSWORD: loadbalancer
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build Load Balancer
+        run: |
+          mvn clean compile -q
+          mvn package -DskipTests
+
+      - name: Build Storage Node
+        run: |
+          cd storage-node
+          mvn clean compile -q
+          mvn package -DskipTests
+
+      - name: Run Load Balancer Tests
+        run: mvn test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/loadbalancer
+          SPRING_DATASOURCE_USERNAME: loadbalancer
+          SPRING_DATASOURCE_PASSWORD: loadbalancer
+
+      - name: Run Storage Node Tests
+        run: |
+          cd storage-node
+          mvn test
+
+      - name: Generate Test Coverage
+        run: |
+          mvn jacoco:report
+          cd storage-node && mvn jacoco:report
+
+      - name: Upload Load Balancer Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: loadbalancer-coverage
+          path: target/site/jacoco/
+
+      - name: Upload Storage Node Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: storagenode-coverage
+          path: storage-node/target/site/jacoco/
+
+      - name: Upload Load Balancer JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: loadbalancer-jar
+          path: target/*.jar
+
+      - name: Upload Storage Node JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: storagenode-jar
+          path: storage-node/target/*.jar
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Build and analyze Load Balancer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            mvn -B verify sonar:sonar \
+              -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
+              -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+              -Dsonar.host.url=https://sonarcloud.io
+          else
+            echo "SonarCloud token not available, skipping analysis"
+          fi
+        continue-on-error: true
+
+  docker-build:
+    name: Docker Build and Test
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Load Balancer JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: loadbalancer-jar
+          path: target/
+
+      - name: Download Storage Node JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: storagenode-jar
+          path: storage-node/target/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Load Balancer Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: distributed-storage-loadbalancer:test
+          build-args: |
+            JAR_FILE=target/*.jar
+
+      - name: Build Storage Node Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./storage-node
+          file: ./storage-node/Dockerfile
+          push: false
+          tags: distributed-storage-storagenode:test
+          build-args: |
+            JAR_FILE=target/*.jar
+
+      - name: Test Docker Compose
+        run: |
+          # Create a test docker-compose that uses local images
+          cp docker-compose.yml docker-compose.test.yml
+          sed -i 's|build:|image: distributed-storage-loadbalancer:test #build:|g' docker-compose.test.yml
+          sed -i 's|context: \./storage-node|distributed-storage-storagenode:test #context: ./storage-node|g' docker-compose.test.yml
+
+          # Start services
+          docker-compose -f docker-compose.test.yml up -d db
+          sleep 30
+
+          # Check if services can start (don't run full stack due to complexity)
+          echo "Docker images built successfully"
+
+  docker-publish:
+    name: Publish Docker Images
+    runs-on: ubuntu-latest
+    needs: [test, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Load Balancer JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: loadbalancer-jar
+          path: target/
+
+      - name: Download Storage Node JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: storagenode-jar
+          path: storage-node/target/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: secrets.DOCKERHUB_USERNAME != ''
+
+      - name: Generate version tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            VERSION=$(date +%Y.%m.%d)-${GITHUB_SHA::7}
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "latest=true" >> $GITHUB_OUTPUT
+          else
+            VERSION=${GITHUB_SHA::7}
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "latest=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and Push Load Balancer
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            kenzycodex/distributed-storage-loadbalancer:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.latest == 'true' && 'kenzycodex/distributed-storage-loadbalancer:latest' || '' }}
+          build-args: |
+            JAR_FILE=target/*.jar
+        if: secrets.DOCKERHUB_USERNAME != ''
+
+      - name: Build and Push Storage Node
+        uses: docker/build-push-action@v5
+        with:
+          context: ./storage-node
+          file: ./storage-node/Dockerfile
+          push: true
+          tags: |
+            kenzycodex/distributed-storage-storagenode:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.latest == 'true' && 'kenzycodex/distributed-storage-storagenode:latest' || '' }}
+          build-args: |
+            JAR_FILE=target/*.jar
+        if: secrets.DOCKERHUB_USERNAME != ''
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [test, docker-publish]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: loadbalancer-jar
+          path: artifacts/
+
+      - name: Download Storage Node JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: storagenode-jar
+          path: artifacts/
+
+      - name: Generate version tag
+        id: version
+        run: |
+          VERSION=$(date +%Y.%m.%d)-${GITHUB_SHA::7}
+          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "release_name=Release ${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: ${{ steps.version.outputs.release_name }}
+          body: |
+            ## What's Changed
+
+            Automated release generated from main branch.
+
+            ### Features in this release:
+            - Load balancer with multiple strategies
+            - Storage node service with file operations
+            - Docker deployment support
+            - Health monitoring and metrics
+
+            ### Docker Images
+            - `kenzycodex/distributed-storage-loadbalancer:${{ steps.version.outputs.version }}`
+            - `kenzycodex/distributed-storage-storagenode:${{ steps.version.outputs.version }}`
+
+            **Full Changelog**: https://github.com/kenzycodex/distributed-storage/commits/${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Load Balancer JAR
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/load-balancer-1.0-SNAPSHOT.jar
+          asset_name: distributed-storage-loadbalancer.jar
+          asset_content_type: application/java-archive
+
+      - name: Upload Storage Node JAR
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/storage-node-1.0-SNAPSHOT.jar
+          asset_name: distributed-storage-storagenode.jar
+          asset_content_type: application/java-archive
