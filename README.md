@@ -35,100 +35,108 @@ DistributedStorage consists of three main components:
   <img src="docs/images/architecture-diagram.png" alt="Architecture Diagram" width="700"/>
 </div>
 
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Java 17 or higher
-- MySQL 8.0 or higher
-- Maven 3.6 or higher
-- Docker (optional, for containerized deployment)
+- **Java 17+**
+- **Docker & Docker Compose**
+- **Maven 3.6+**
 
-### Installation
-
-#### Option 1: Manual Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/kenzycodex/distributed-storage.git
-   cd distributed-storage
-   ```
-
-2. Configure the database:
-   ```bash
-   # Create MySQL database
-   mysql -u root -p
-   CREATE DATABASE loadbalancer;
-   CREATE USER 'loadbalancer'@'localhost' IDENTIFIED BY 'loadbalancer';
-   GRANT ALL PRIVILEGES ON loadbalancer.* TO 'loadbalancer'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
-
-3. Build the project:
-   ```bash
-   mvn clean package
-   ```
-
-4. Start the load balancer:
-   ```bash
-   java -jar target/loadbalancer.jar
-   ```
-
-5. Start storage nodes (in separate terminals):
-   ```bash
-   java -jar target/storage-node.jar --server.port=8081
-   java -jar target/storage-node.jar --server.port=8082
-   ```
-
-#### Option 2: Docker Deployment
-
-1. Build Docker images:
-   ```bash
-   docker-compose build
-   ```
-
-2. Start the services:
-   ```bash
-   docker-compose up -d
-   ```
-
-### Usage
-
-#### File Upload
+### Option 1: Docker (Recommended)
 
 ```bash
-curl -X POST -H "X-User-ID: 1" -F "file=@/path/to/file.txt" http://localhost:8080/api/v1/files/upload
+# Clone the repository
+git clone https://github.com/kenzycodex/distributed-storage.git
+cd distributed-storage
+
+# Start all services
+docker-compose up -d
+
+# Check service status
+docker-compose ps
 ```
 
-#### File Download
+**Services Available:**
+- Load Balancer: http://localhost:8080
+- Storage Nodes: http://localhost:8081, :8082, :8083
+- Grafana Dashboard: http://localhost:3000 (admin/admin)
+- Prometheus: http://localhost:9090
+
+### Option 2: Manual Setup
 
 ```bash
-curl -X GET -H "X-User-ID: 1" http://localhost:8080/api/v1/files/123 --output file.txt
+# 1. Clone and build
+git clone https://github.com/kenzycodex/distributed-storage.git
+cd distributed-storage
+mvn clean package
+cd storage-node && mvn clean package && cd ..
+
+# 2. Setup MySQL
+mysql -u root -p
+CREATE DATABASE loadbalancer;
+CREATE USER 'loadbalancer'@'localhost' IDENTIFIED BY 'loadbalancer';
+GRANT ALL PRIVILEGES ON loadbalancer.* TO 'loadbalancer'@'localhost';
+
+# 3. Start Load Balancer
+java -jar target/load-balancer-1.0-SNAPSHOT.jar
+
+# 4. Start Storage Nodes (in separate terminals)
+cd storage-node
+java -jar target/storage-node-1.0-SNAPSHOT.jar --server.port=8081 --storage.node.name=node-1
+java -jar target/storage-node-1.0-SNAPSHOT.jar --server.port=8082 --storage.node.name=node-2
+java -jar target/storage-node-1.0-SNAPSHOT.jar --server.port=8083 --storage.node.name=node-3
 ```
 
-#### File Deletion
+## 📝 Usage Examples
 
 ```bash
+# Upload a file
+curl -X POST -H "X-User-ID: 1" -F "file=@test.txt" http://localhost:8080/api/v1/files/upload
+
+# Download a file (replace 123 with actual file ID from upload response)
+curl -X GET -H "X-User-ID: 1" http://localhost:8080/api/v1/files/123 --output downloaded.txt
+
+# Delete a file
 curl -X DELETE -H "X-User-ID: 1" http://localhost:8080/api/v1/files/123
+
+# Check system health
+curl http://localhost:8080/actuator/health
+
+# View metrics
+curl http://localhost:8080/api/v1/metrics/stats
 ```
 
-## Documentation
+## 📚 Documentation
 
-### Configuration
+| Document | Description |
+|----------|-------------|
+| [**Developer Setup**](DEVELOPER_SETUP.md) | Complete setup, testing, and development guide |
+| [**API Reference**](docs/api.md) | Comprehensive API documentation |
+| [**Configuration**](docs/configuration.md) | Configuration options and environment variables |
+| [**Load Balancing**](docs/load-balancing-strategies.md) | Available load balancing algorithms |
+| [**Implementation Phases**](docs/IMPLEMENTATION_PHASES.md) | Development roadmap and phases |
+| [**Contributing**](CONTRIBUTING.md) | How to contribute to the project |
 
-All configuration options are available in `application.yml`. For detailed information on configuration properties, see our [Configuration Guide](docs/configuration.md).
+## ⚡ Current Status
 
-### API Reference
+✅ **Phase 1 Complete**: Core storage node implementation
+🔄 **Phase 2 In Progress**: File metadata persistence
+📋 **Next**: Enhanced node management and comprehensive testing
 
-For comprehensive API documentation including endpoints, request/response formats, and examples, see our [API Guide](docs/api.md).
+**What's Working:**
+- ✅ Complete load balancer with 5 strategies
+- ✅ Storage nodes with file operations
+- ✅ Automatic node registration and heartbeat
+- ✅ Health monitoring and metrics
+- ✅ Docker deployment
+- ✅ RESTful API
 
-### Load Balancing Strategies
-
-DistributedStorage supports multiple load balancing algorithms to optimize different workloads. Learn more in the [Load Balancing Strategies](docs/load-balancing-strategies.md) documentation.
-
-### Roadmap
-
-For information about planned features and enhancements, see our [Project Roadmap](ROADMAP.md).
+**Production Ready Features:**
+- Load balancing across multiple storage nodes
+- File upload, download, and deletion
+- System monitoring and health checks
+- Containerized deployment
 
 ## Monitoring & Metrics
 
