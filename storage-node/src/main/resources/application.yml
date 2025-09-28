@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: storage-node
+  servlet:
+    multipart:
+      max-file-size: 1GB
+      max-request-size: 1GB
+
+server:
+  port: ${SERVER_PORT:8081}
+
+storage:
+  base-path: ${STORAGE_BASE_PATH:/app/storage}
+  node:
+    name: ${NODE_NAME:storage-node-1}
+    capacity: ${NODE_CAPACITY:10737418240} # 10GB default
+    host: ${NODE_HOST:localhost}
+    port: ${SERVER_PORT:8081}
+  loadbalancer:
+    host: ${LOADBALANCER_HOST:localhost}
+    port: ${LOADBALANCER_PORT:8080}
+    registration-url: http://${storage.loadbalancer.host}:${storage.loadbalancer.port}/api/v1/nodes/register
+    heartbeat-url: http://${storage.loadbalancer.host}:${storage.loadbalancer.port}/api/v1/nodes/heartbeat
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.storagenode: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
