@@ -1,5 +1,5 @@
 # Use Eclipse Temurin's JRE Alpine as base image (smaller than openjdk:slim)
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Add curl for healthchecks and bash for scripts
 RUN apk add --no-cache curl bash
