@@ -88,10 +88,18 @@ jobs:
         run: |
           docker-compose config --quiet
 
-      - name: Security Scan
-        uses: securecodewarrior/github-action-add-sarif@v1
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          sarif-file: 'security-scan.sarif'
+          languages: java
+        continue-on-error: true
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        continue-on-error: true
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
         continue-on-error: true
 
       - name: Comment PR Results
